@@ -39,7 +39,7 @@ def parse_arguments(parser: argparse.ArgumentParser):
     parser.add_argument('--l2', type=float, default=1e-8)
     parser.add_argument('--lr_decay', type=float, default=0)
     parser.add_argument('--batch_size', type=int, default=10, help="default batch size is 10 (works well)")
-    parser.add_argument('--num_epochs', type=int, default=5, help="Usually we set to 10.")
+    parser.add_argument('--num_epochs', type=int, default=100, help="Usually we set to 10.")
     parser.add_argument('--train_num', type=int, default=-1, help="-1 means all the data")
     parser.add_argument('--dev_num', type=int, default=-1, help="-1 means all the data")
     parser.add_argument('--test_num', type=int, default=-1, help="-1 means all the data")
@@ -89,6 +89,9 @@ def train_one(config: Config, train_batches: List[Tuple], dev_insts: List[Instan
     model = NNCRF(config)
     model.to(config.device)
     model.train()
+    res_file = 'results/res.csv'
+    with open(res_file, 'a') as f:
+        f.write('epoch, epoch_loss,  precision,  recall,  f1\n')
     optimizer = get_optimizer(config, model)
     epoch = config.num_epochs
     best_dev_f1 = -1
@@ -109,9 +112,12 @@ def train_one(config: Config, train_batches: List[Tuple], dev_insts: List[Instan
         end_time = time.time()
         print("Epoch %d: %.5f, Time is %.2fs" % (i, epoch_loss, end_time - start_time), flush=True)
 
+        torch.save(model.state_dict(), model_name.split('/')[0] + '/last.pt')
         model.eval()
         # metric is [precision, recall, f_score]
         dev_metrics = evaluate_model(config, model, dev_batches, "dev", dev_insts)
+        with open(res_file, 'a') as f:
+            f.write('{},  {},  {},  {},  {}\n'.format(i, epoch_loss, *dev_metrics))
         if test_insts is not None:
             test_metrics = evaluate_model(config, model, test_batches, "test", test_insts)
         if dev_metrics[2] > best_dev_f1:
